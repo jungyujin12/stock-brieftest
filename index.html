@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>관심종목 뉴스 분석기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Nanum+Gothic+Coding:wght@400;700&family=Pretendard:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f5f2eb;
+  --ink: #1a1410;
+  --ink2: #4a3f35;
+  --muted: #9a8f85;
+  --rule: #d8d0c4;
+  --card: #faf8f4;
+  --accent: #c84b2f;
+  --accent2: #2f6bc8;
+  --good: #1a7a3c;
+  --bad: #b82020;
+  --warn: #c87a10;
+  --tag-bg: #ede9e2;
+  --shadow: 0 2px 12px rgba(26,20,16,0.08);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Pretendard', 'Apple SD Gothic Neo', sans-serif;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* 신문 컬럼 그리드 텍스처 */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent calc(100% / 12 - 1px),
+    rgba(26,20,16,0.03) calc(100% / 12 - 1px),
+    rgba(26,20,16,0.03) calc(100% / 12)
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── MASTHEAD ── */
+.masthead {
+  position: relative;
+  z-index: 10;
+  border-bottom: 3px double var(--ink);
+  padding: 0 32px;
+  background: var(--bg);
+}
+
+.masthead-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0 8px;
+  border-bottom: 1px solid var(--rule);
+  gap: 16px;
+}
+
+.paper-name {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 1.8rem;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.paper-name span {
+  color: var(--accent);
+}
+
+.masthead-meta {
+  font-family: 'Nanum Gothic Coding', monospace;
+  font-size: 0.65rem;
+  color: var(--muted);
+  text-align: right;
+  line-height: 1.6;
+}
+
+.api-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.api-label {
+  font-family: 'Nanum Gothic Coding', monospace;
+  font-size: 0.65rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.api-input {
+  flex: 1;
+  max-width: 280px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink);
+  font-family: 'Nanum Gothic Coding', monospace;
+  font-size: 0.72rem;
+  padding: 4px 0;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.api-input:focus { border-bottom-color: var(--accent); }
+.api-input.saved { border-bottom-color: var(--good); }
+
+.api-save {
+  background: var(--ink);
+  color: var(--bg);
+  border: none;
+  font-family: 'Nanum Gothic Coding', monospace;
+  font-size: 0.65rem;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+  letter-spacing: 0.05em;
+}
+
+.api-save:hover { background: var(--accent); }
+
+.api-notice {
+  font-family: 'Nanum Gothic Coding', monospace;
+  font-size: 0.6rem;
+  color: var(--muted);
+  margin-left: auto;
+}
+
+.api-notice a { color: var(--accent2); }
+
+/* ── LAYOUT ── */
+.layout {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: calc(100vh - 100px);
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  border-right: 1px solid var(--rule);
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: var(--bg);
+}
+
+.sidebar-title {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 12px;
+}
+
+/* ADD FORM */
+.add-form {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.add-name {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  font-family: 'Pretendard', sans-serif;
+  font-size: 0.78rem;
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.add-name:focus { border-color: var(--ink); }
+
+.add-code {
+  width: 72px;
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  font-family: 'Nanum Gothic Coding', monospace;
+  font-size: 0.72rem;
+  padding: 7px 8px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.add-code:focus { border-color: var(--ink); }
+
+.add-btn {
+  background: var(--ink);
+  color: var(--bg);
+  border: none;
+  font-size: 1rem;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.add-btn:hover { background: var(--accent); }
+
+/* WATCHLIST */
+.watchlist { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto; }
+
+.stock-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all 0.15s;
+  border-radius: 0 2px 2px 0;
+}
+
+.stock-item:hover { background: var(--tag-bg); }
+.stock-item.active { border-left-color: var(--accent); background: var(--tag-bg); }
+
+.stock-item-info { flex: 1; min-width: 0; }
+
+.stock-item-name {
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stock-item-code {
+  font-family: 'Nanum Gothic Coding', monospace;
+  font-size: 0.6rem;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.stock-item-status {
+  font-family: 'Nanum Gothic Coding', monospace;
+  font-size: 0.58rem;
+  color: var(--muted);
+  white-space: nowrap;
+  margin-left: 8px;
+}
+
+.stock-item-del {
+  background: none;
+  border: none;
+  color: var(--rule);
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  margin-left: 4px;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+
+.stock-item-del:hover { color: var(--bad); }
+
+.empty-state {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.8;
+  border: 1px dashed var(--rule);
+}
+
+/* ── MAIN CONTENT ── */
+.content {
+  padding: 28px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow-y: auto;
+}
+
+/* WELCOME STATE */
+.welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 400px;
+  gap: 16px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.welcome-icon {
+  font-size: 3rem;
+  opacity: 0.3;
+}
+
+.welcome h2 {
+  font-family: 'Syne', sans-serif;
+  font-size: 1rem;
+  color: var(--ink2);
+  font-weight: 600;
+}
+
+.welcome p {
+  font-size: 0.78rem;
+  line-height: 1.7;
+  max-width: 280px;
+}
+
+/* ARTICLE HEADER */
+.article-head {
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+}
+
+.article-eyebrow {
+  font-family: 'Nanum Gothic Coding', monospace;
+  font-size: 0.62rem;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 6px;
+}
+
+.article-title {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 2rem;
+  line-height: 1.1;
+  color: var(--ink);
+  margin-bottom: 8px;
+  letter-spacing: -0.02em;
+}
+
+.article-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-family: 'Nanum Gothic Coding', monospace;
+  font-size: 0.62rem;
+  color: var(--muted);
+}
+
+.article-meta span { display: flex; align-items: center; gap: 4px; }
+
+/* REFRESH BTN */
+.refresh-btn {
+  background: var(--ink);
+  color: var(--bg);
+  border: none;
+  font-family: 'Syne', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  padding: 8px 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.refresh-btn:hover { background: var(--accent); }
+.refresh-btn:disabled { background: var(--rule); color: var(--muted); cursor: not-allowed; }
+
+.refresh-btn .spin {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border: 2px solid rgba(245,242,235,0.3);
+  border-top-color: var(--bg);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* COLUMNS LAYOUT */
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 24px;
+  margin-top: 4px;
+}
+
+/* NEWS CARD */
+.news-col {}
+
+.col-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--ink);
+  margin-bottom: 16px;
+}
+
+.col-icon {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.col-icon.neutral { background: var(--ink); color: var(--bg); }
+.col-icon.good { background: var(--good); color: #fff; }
+.col-icon.bad { background: var(--bad); color: #fff; }
+
+.col-title {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.col-title.neutral { color: var(--ink); }
+.col-title.good { color: var(--good); }
+.col-title.bad { color: var(--bad); }
+
+/* NEWS ITEMS */
+.news-items { display: flex; flex-direction: column; gap: 14px; }
+
+.news-item {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.news-item:last-child { border-bottom: none; padding-bottom: 0; }
+
+.news-headline {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.45;
+  margin-bottom: 4px;
+}
+
+.news-desc {
+  font-size: 0.72rem;
+  color: var(--ink2);
+  line-height: 1.6;
+}
+
+.news-tag {
+  display: inline-block;
+  background: var(--tag-bg);
+  color: var(--muted);
+  font-family: 'Nanum Gothic Coding', monospace;
+  font-size: 0.58rem;
+  padding: 1px 6px;
+  margin-top: 5px;
+  letter-spacing: 0.05em;
+}
+
+.news-tag.good { background: #e8f5ec; color: var(--good); }
+.news-tag.bad { background: #fdf0f0; color: var(--bad); }
+
+/* LOADING STATE */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  gap: 16px;
+  color: var(--muted);
+}
+
+.loading-bar {
+  width: 200px;
+  height: 2px;
+  background: var(--rule);
+  overflow: hidden;
+}
+
+.loading-bar::after {
+  content: '';
+  display: block;
+  width: 40%;
+  height: 100%;
+  background: var(--accent);
+  animation: slide 1.2s ease-in-out infinite;
+}
+
+@keyframes slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+.loading-text {
+  font-family: 'Nanum Gothic Coding', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+}
+
+/* ONE-LINE SUMMARY */
+.summary-bar {
+  background: var(--ink);
+  color: var(--bg);
+  padding: 12px 20px;
+  margin-top: 28px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.summary-label {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  padding-top: 1px;
+  color: rgba(245,242,235,0.5);
+}
+
+.summary-text {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--bg);
+}
+
+/* UPDATED AT */
+.updated-badge {
+  font-family: 'Nanum Gothic Coding', monospace;
+  font-size: 0.6rem;
+  color: var(--muted);
+  margin-top: 16px;
+  text-align: right;
+}
+
+/* TOAST */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--ink);
+  color: var(--bg);
+  font-family: 'Nanum Gothic Coding', monospace;
+  font-size: 0.7rem;
+  padding: 10px 16px;
+  z-index: 999;
+  transform: translateY(20px);
+  opacity: 0;
+  transition: all 0.25s;
+  border-left: 3px solid var(--accent);
+}
+
+.toast.show { transform: translateY(0); opacity: 1; }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--rule); }
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { border-right: none; border-bottom: 1px solid var(--rule); padding: 16px; }
+  .watchlist { flex-direction: row; flex-wrap: wrap; overflow-y: visible; }
+  .content { padding: 20px 16px; }
+  .columns { grid-template-columns: 1fr; }
+  .article-title { font-size: 1.4rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- MASTHEAD -->
+<div class="masthead">
+  <div class="masthead-top">
+    <div class="paper-name">STOCK<span>BRIEF</span></div>
+    <div class="masthead-meta" id="dateDisplay"></div>
+    <div class="api-row" style="margin-left:auto;">
+      <span class="api-label">GEMINI KEY</span>
+      <input class="api-input" type="password" id="apiKey" placeholder="AIza..." autocomplete="off">
+      <button class="api-save" onclick="saveKey()">저장</button>
+      <span class="api-notice"><a href="https://aistudio.google.com/apikey" target="_blank">무료 발급 →</a></span>
+    </div>
+  </div>
+</div>
+
+<!-- LAYOUT -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-title">관심종목</div>
+
+    <div class="add-form">
+      <input class="add-name" id="addName" placeholder="종목명" maxlength="20" onkeydown="if(event.key==='Enter')addStock()">
+      <input class="add-code" id="addCode" placeholder="코드" maxlength="6" onkeydown="if(event.key==='Enter')addStock()">
+      <button class="add-btn" onclick="addStock()" title="추가">+</button>
+    </div>
+
+    <div class="watchlist" id="watchlist"></div>
+  </aside>
+
+  <!-- CONTENT -->
+  <main class="content" id="content">
+    <div class="welcome">
+      <div class="welcome-icon">📰</div>
+      <h2>관심종목을 선택하세요</h2>
+      <p>좌측에서 종목을 추가하고 클릭하면<br>최신 뉴스·호재·악재를 분석합니다.</p>
+    </div>
+  </main>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────
+let apiKey = localStorage.getItem('sb_key') || '';
+let watchlist = JSON.parse(localStorage.getItem('sb_watchlist') || '[]');
+let activeId = null;
+let isLoading = false;
+// cache: { id: { data, updatedAt } }
+let cache = {};
+
+const MODEL = 'gemini-2.0-flash';
+
+// ── INIT ───────────────────────────────────────────────
+(function init() {
+  // date
+  const now = new Date();
+  document.getElementById('dateDisplay').textContent =
+    now.toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'short' }) +
+    '\nGemini 2.0 Flash / Free Tier';
+
+  // api key
+  if (apiKey) {
+    const inp = document.getElementById('apiKey');
+    inp.value = apiKey;
+    inp.classList.add('saved');
+  }
+
+  renderWatchlist();
+})();
+
+// ── API KEY ────────────────────────────────────────────
+function saveKey() {
+  const v = document.getElementById('apiKey').value.trim();
+  if (!v) { toast('API 키를 입력하세요.'); return; }
+  apiKey = v;
+  localStorage.setItem('sb_key', v);
+  document.getElementById('apiKey').classList.add('saved');
+  toast('✓ 저장되었습니다.');
+}
+
+// ── WATCHLIST ──────────────────────────────────────────
+function addStock() {
+  const name = document.getElementById('addName').value.trim();
+  const code = document.getElementById('addCode').value.trim();
+  if (!name) { toast('종목명을 입력하세요.'); return; }
+
+  const id = Date.now().toString();
+  watchlist.push({ id, name, code });
+  localStorage.setItem('sb_watchlist', JSON.stringify(watchlist));
+  document.getElementById('addName').value = '';
+  document.getElementById('addCode').value = '';
+  renderWatchlist();
+  selectStock(id);
+}
+
+function removeStock(id, e) {
+  e.stopPropagation();
+  watchlist = watchlist.filter(s => s.id !== id);
+  localStorage.setItem('sb_watchlist', JSON.stringify(watchlist));
+  delete cache[id];
+  if (activeId === id) {
+    activeId = null;
+    showWelcome();
+  }
+  renderWatchlist();
+}
+
+function renderWatchlist() {
+  const el = document.getElementById('watchlist');
+  if (!watchlist.length) {
+    el.innerHTML = `<div class="empty-state">종목을 추가하면<br>여기에 표시됩니다.</div>`;
+    return;
+  }
+  el.innerHTML = watchlist.map(s => {
+    const cached = cache[s.id];
+    const status = cached
+      ? `<span class="stock-item-status">${timeSince(cached.updatedAt)}</span>`
+      : '';
+    return `
+    <div class="stock-item${s.id === activeId ? ' active' : ''}" onclick="selectStock('${s.id}')">
+      <div class="stock-item-info">
+        <div class="stock-item-name">${escHtml(s.name)}</div>
+        ${s.code ? `<div class="stock-item-code">${escHtml(s.code)}</div>` : ''}
+      </div>
+      ${status}
+      <button class="stock-item-del" onclick="removeStock('${s.id}', event)" title="삭제">×</button>
+    </div>`;
+  }).join('');
+}
+
+function selectStock(id) {
+  activeId = id;
+  renderWatchlist();
+  const stock = watchlist.find(s => s.id === id);
+  if (!stock) return;
+
+  if (cache[id]) {
+    renderResult(stock, cache[id].data, cache[id].updatedAt);
+  } else {
+    fetchAnalysis(stock);
+  }
+}
+
+// ── FETCH ──────────────────────────────────────────────
+async function fetchAnalysis(stock) {
+  if (!apiKey) { toast('⚠️ Gemini API 키를 먼저 저장하세요.'); return; }
+  if (isLoading) return;
+  isLoading = true;
+
+  showLoading(stock.name);
+
+  const prompt = `당신은 한국 주식 전문 애널리스트입니다.
+아래 종목에 대해 최신 정보 기반으로 분석하세요.
+
+종목: ${stock.name}${stock.code ? ` (${stock.code})` : ''}
+분석 기준일: ${new Date().toLocaleDateString('ko-KR')}
+
+반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만 출력하세요.
+
+{
+  "news": [
+    { "headline": "뉴스 제목 (핵심 사실 중심)", "desc": "2~3문장 요약", "tag": "최신뉴스" },
+    { "headline": "...", "desc": "...", "tag": "..." },
+    { "headline": "...", "desc": "...", "tag": "..." }
+  ],
+  "pros": [
+    { "headline": "호재 제목", "desc": "2~3문장 설명", "tag": "호재" },
+    { "headline": "...", "desc": "...", "tag": "..." },
+    { "headline": "...", "desc": "...", "tag": "..." }
+  ],
+  "cons": [
+    { "headline": "악재 제목", "desc": "2~3문장 설명", "tag": "악재" },
+    { "headline": "...", "desc": "...", "tag": "..." },
+    { "headline": "...", "desc": "...", "tag": "..." }
+  ],
+  "summary": "종목 전체 한줄 요약 (팩트 중심, 투자 권유 없이)"
+}
+
+규칙:
+- 할루시네이션 금지. 불확실한 정보는 "확인 필요"로 표기
+- 투자 권유 금지
+- 한국어로 작성
+- JSON 외 다른 텍스트 절대 포함 금지`;
+
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 2048, temperature: 0.4 }
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    let raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    raw = raw.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();
+
+    const parsed = JSON.parse(raw);
+    const now = new Date();
+    cache[activeId] = { data: parsed, updatedAt: now };
+    renderWatchlist();
+
+    const stock2 = watchlist.find(s => s.id === activeId);
+    if (stock2) renderResult(stock2, parsed, now);
+
+  } catch (err) {
+    showError(err.message);
+    toast(`❌ ${err.message}`);
+  } finally {
+    isLoading = false;
+  }
+}
+
+// ── RENDER ─────────────────────────────────────────────
+function showWelcome() {
+  document.getElementById('content').innerHTML = `
+    <div class="welcome">
+      <div class="welcome-icon">📰</div>
+      <h2>관심종목을 선택하세요</h2>
+      <p>좌측에서 종목을 추가하고 클릭하면<br>최신 뉴스·호재·악재를 분석합니다.</p>
+    </div>`;
+}
+
+function showLoading(name) {
+  document.getElementById('content').innerHTML = `
+    <div class="loading-state">
+      <div class="loading-text">[ ${escHtml(name)} 분석 중... ]</div>
+      <div class="loading-bar"></div>
+      <div style="font-family:'Nanum Gothic Coding',monospace;font-size:0.6rem;color:var(--muted);">Gemini AI가 최신 정보를 수집하고 있습니다</div>
+    </div>`;
+}
+
+function showError(msg) {
+  document.getElementById('content').innerHTML = `
+    <div class="loading-state">
+      <div style="font-size:2rem;opacity:0.3">⚠️</div>
+      <div style="font-family:'Nanum Gothic Coding',monospace;font-size:0.72rem;color:var(--bad);">오류: ${escHtml(msg)}</div>
+      <div style="font-family:'Nanum Gothic Coding',monospace;font-size:0.6rem;color:var(--muted);">API 키 확인 후 다시 시도하세요.</div>
+    </div>`;
+}
+
+function renderResult(stock, d, updatedAt) {
+  const newsHtml = renderItems(d.news || [], 'neutral');
+  const prosHtml = renderItems(d.pros || [], 'good');
+  const consHtml = renderItems(d.cons || [], 'bad');
+  const updStr = updatedAt instanceof Date
+    ? updatedAt.toLocaleString('ko-KR')
+    : new Date(updatedAt).toLocaleString('ko-KR');
+
+  document.getElementById('content').innerHTML = `
+    <div class="article-head">
+      <div class="article-eyebrow">관심종목 분석 리포트</div>
+      <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;">
+        <div class="article-title">${escHtml(stock.name)}${stock.code ? `<span style="font-size:1rem;color:var(--muted);font-weight:400;margin-left:12px;">${escHtml(stock.code)}</span>` : ''}</div>
+        <button class="refresh-btn" onclick="refresh()" id="refreshBtn">
+          <span>↻ 새로고침</span>
+        </button>
+      </div>
+      <div class="article-meta">
+        <span>⚡ Gemini 2.0 Flash</span>
+        <span>📅 ${updStr}</span>
+        <span style="color:var(--bad);font-size:0.58rem;">※ 투자 권유 아님</span>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="news-col">
+        <div class="col-header">
+          <div class="col-icon neutral">N</div>
+          <div class="col-title neutral">최신 뉴스</div>
+        </div>
+        <div class="news-items">${newsHtml}</div>
+      </div>
+      <div class="news-col">
+        <div class="col-header">
+          <div class="col-icon good">▲</div>
+          <div class="col-title good">호재</div>
+        </div>
+        <div class="news-items">${prosHtml}</div>
+      </div>
+      <div class="news-col">
+        <div class="col-header">
+          <div class="col-icon bad">▼</div>
+          <div class="col-title bad">악재</div>
+        </div>
+        <div class="news-items">${consHtml}</div>
+      </div>
+    </div>
+
+    ${d.summary ? `
+    <div class="summary-bar">
+      <div class="summary-label">한줄 요약</div>
+      <div class="summary-text">${escHtml(d.summary)}</div>
+    </div>` : ''}
+
+    <div class="updated-badge">마지막 업데이트: ${updStr}</div>`;
+}
+
+function renderItems(items, type) {
+  if (!items.length) return `<div style="color:var(--muted);font-size:0.72rem;">항목 없음</div>`;
+  return items.map(item => `
+    <div class="news-item">
+      <div class="news-headline">${escHtml(item.headline || '')}</div>
+      <div class="news-desc">${escHtml(item.desc || '')}</div>
+      ${item.tag ? `<span class="news-tag ${type}">${escHtml(item.tag)}</span>` : ''}
+    </div>`).join('');
+}
+
+function refresh() {
+  const stock = watchlist.find(s => s.id === activeId);
+  if (!stock) return;
+  delete cache[activeId];
+  fetchAnalysis(stock);
+}
+
+// ── UTILS ──────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function timeSince(d) {
+  const sec = Math.floor((Date.now() - new Date(d)) / 1000);
+  if (sec < 60) return '방금 전';
+  if (sec < 3600) return `${Math.floor(sec/60)}분 전`;
+  if (sec < 86400) return `${Math.floor(sec/3600)}시간 전`;
+  return `${Math.floor(sec/86400)}일 전`;
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
