@@ -604,10 +604,10 @@ body::before {
     <div class="paper-name">STOCK<span>BRIEF</span></div>
     <div class="masthead-meta" id="dateDisplay"></div>
     <div class="api-row" style="margin-left:auto;">
-      <span class="api-label">GEMINI KEY</span>
+      <span class="api-label">GROQ KEY</span>
       <input class="api-input" type="password" id="apiKey" placeholder="AIza..." autocomplete="off">
       <button class="api-save" onclick="saveKey()">저장</button>
-      <span class="api-notice"><a href="https://aistudio.google.com/apikey" target="_blank">무료 발급 →</a></span>
+      <span class="api-notice"><a href="https://console.groq.com/keys" target="_blank">Groq 무료 발급 →</a></span>
     </div>
   </div>
 </div>
@@ -643,14 +643,14 @@ body::before {
 
 <script>
 // ── STATE ──────────────────────────────────────────────
-let apiKey = localStorage.getItem('sb_key') || '';
+let apiKey = localStorage.getItem('sb_groq_key') || '';
 let watchlist = JSON.parse(localStorage.getItem('sb_watchlist') || '[]');
 let activeId = null;
 let isLoading = false;
 // cache: { id: { data, updatedAt } }
 let cache = {};
 
-const MODEL = 'gemini-1.5-flash-latest';
+const MODEL = 'llama-3.3-70b-versatile';
 
 // ── INIT ───────────────────────────────────────────────
 (function init() {
@@ -658,7 +658,7 @@ const MODEL = 'gemini-1.5-flash-latest';
   const now = new Date();
   document.getElementById('dateDisplay').textContent =
     now.toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'short' }) +
-    '\nGemini 2.0 Flash / Free Tier';
+    '\nGroq / Free Tier';
 
   // api key
   if (apiKey) {
@@ -675,7 +675,7 @@ function saveKey() {
   const v = document.getElementById('apiKey').value.trim();
   if (!v) { toast('API 키를 입력하세요.'); return; }
   apiKey = v;
-  localStorage.setItem('sb_key', v);
+  localStorage.setItem('sb_groq_key', v);
   document.getElementById('apiKey').classList.add('saved');
   toast('✓ 저장되었습니다.');
 }
@@ -792,14 +792,18 @@ async function fetchAnalysis(stock) {
 - JSON 외 다른 텍스트 절대 포함 금지`;
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
+    const url = 'https://api.groq.com/openai/v1/chat/completions';
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        tools: [{ google_search: {} }],
-        generationConfig: { maxOutputTokens: 2048, temperature: 0.3 }
+        model: MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 2048,
+        temperature: 0.3
       })
     });
 
@@ -809,8 +813,7 @@ async function fetchAnalysis(stock) {
     }
 
     const data = await res.json();
-    const parts = data.candidates?.[0]?.content?.parts || [];
-    let raw = parts.filter(p => p.text).map(p => p.text).join('');
+    let raw = data.choices?.[0]?.message?.content || '';
     raw = raw.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('분석 결과 파싱 실패. 다시 시도해주세요.');
@@ -845,7 +848,7 @@ function showLoading(name) {
     <div class="loading-state">
       <div class="loading-text">[ ${escHtml(name)} 분석 중... ]</div>
       <div class="loading-bar"></div>
-      <div style="font-family:'Nanum Gothic Coding',monospace;font-size:0.6rem;color:var(--muted);">Gemini AI가 최신 정보를 수집하고 있습니다</div>
+      <div style="font-family:'Nanum Gothic Coding',monospace;font-size:0.6rem;color:var(--muted);">Groq AI가 분석 중입니다</div>
     </div>`;
 }
 
@@ -876,7 +879,7 @@ function renderResult(stock, d, updatedAt) {
         </button>
       </div>
       <div class="article-meta">
-        <span>⚡ Gemini 2.0 Flash</span>
+        <span>⚡ Groq llama-3.3-70b</span>
         <span>📅 ${updStr}</span>
         <span style="color:var(--bad);font-size:0.58rem;">※ 투자 권유 아님</span>
       </div>
