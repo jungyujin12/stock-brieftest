@@ -248,15 +248,32 @@ let isDark = localStorage.getItem('sb_dark') === '1';
     now.toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'short' }) +
     '\nNaver News + DART + Ollama AI';
 
-  if (WORKER_URL) {
-    document.getElementById('serverUrl').value = WORKER_URL;
-    checkServer();
-  }
+  autoLoadUrl();
   renderSectorFilter();
   renderWatchlist();
 })();
 
 // ── SERVER URL ─────────────────────────────────────────
+const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/jungyujin12/stock-brieftest/main/server_url.txt';
+
+async function autoLoadUrl() {
+  try {
+    const res = await fetch(GITHUB_RAW_URL + '?t=' + Date.now());
+    if (res.ok) {
+      const url = (await res.text()).trim();
+      if (url && url.startsWith('https://')) {
+        WORKER_URL = url;
+        localStorage.setItem('sb_server_url', url);
+        document.getElementById('serverUrl').value = url;
+        await checkServer();
+        return;
+      }
+    }
+  } catch(e) {}
+  // GitHub에서 못 가져오면 로컬스토리지 사용
+  if (WORKER_URL) checkServer();
+}
+
 function saveUrl() {
   const val = document.getElementById('serverUrl').value.trim().replace(/\/$/, '');
   if (!val) { toast('URL을 입력하세요.'); return; }
@@ -272,13 +289,11 @@ async function checkServer() {
   statusEl.style.color = 'var(--muted)';
   try {
     const res = await fetch(`${WORKER_URL}/`, { signal: AbortSignal.timeout(5000) });
-    const data = await res.json();
     if (res.ok) {
       statusEl.textContent = '✓ 연결됨';
       statusEl.style.color = 'var(--good)';
       apiEl.textContent = '● 서버 연결됨';
       apiEl.style.color = 'var(--good)';
-      toast('✓ 서버 연결 성공!');
       if (activeId === null) showWelcomeConnected();
     }
   } catch(e) {
@@ -286,7 +301,6 @@ async function checkServer() {
     statusEl.style.color = 'var(--bad)';
     apiEl.textContent = '● 서버 미연결';
     apiEl.style.color = 'var(--bad)';
-    toast('❌ 서버 연결 실패. URL을 확인하세요.');
   }
 }
 
