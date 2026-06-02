@@ -252,6 +252,9 @@ let isDark = localStorage.getItem('sb_dark') === '1';
   autoLoadUrl();
   renderSectorFilter();
   renderWatchlist();
+
+  // 🔥 여기 추가
+  setInterval(autoLoadUrl, 5000);
 })();
 
 // ── SERVER URL ─────────────────────────────────────────
