@@ -743,81 +743,47 @@ function selectStock(id) {
   }
 }
 
+// ── WORKER URL ───────────────────────────────────────────
+const WORKER_URL = 'https://stock-api.jyj2315.workers.dev';
+
 // ── FETCH ──────────────────────────────────────────────
 async function fetchAnalysis(stock) {
-  if (!apiKey) { toast('⚠️ Gemini API 키를 먼저 저장하세요.'); return; }
+  if (!apiKey) { toast('⚠️ Groq API 키를 먼저 저장하세요.'); return; }
   if (isLoading) return;
   isLoading = true;
 
   showLoading(stock.name);
 
-  const today = new Date().toLocaleDateString('ko-KR');
-  const prompt = `당신은 한국 주식 전문 애널리스트입니다.
-오늘 날짜: ${today}
-
-반드시 웹 검색을 통해 "${stock.name}${stock.code ? `(${stock.code})` : ''}" 종목의 최신 뉴스, 호재, 악재를 실시간으로 검색하고 분석하세요.
-
-검색할 키워드 예시:
-- "${stock.name} 뉴스 2025"
-- "${stock.name} 호재 악재"
-- "${stock.name} 실적 공시"
-- "${stock.code || stock.name} 주가 전망"
-
-검색 결과를 바탕으로 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만 출력하세요.
-
-{
-  "news": [
-    { "headline": "실제 검색된 뉴스 제목", "desc": "뉴스 내용 2~3문장 요약", "tag": "날짜 또는 출처" },
-    { "headline": "...", "desc": "...", "tag": "..." },
-    { "headline": "...", "desc": "...", "tag": "..." }
-  ],
-  "pros": [
-    { "headline": "호재 제목", "desc": "구체적 수치나 근거 포함 설명", "tag": "호재" },
-    { "headline": "...", "desc": "...", "tag": "..." },
-    { "headline": "...", "desc": "...", "tag": "..." }
-  ],
-  "cons": [
-    { "headline": "악재 제목", "desc": "구체적 수치나 근거 포함 설명", "tag": "악재" },
-    { "headline": "...", "desc": "...", "tag": "..." },
-    { "headline": "...", "desc": "...", "tag": "..." }
-  ],
-  "summary": "검색 결과 기반 한줄 요약 (팩트 중심, 투자 권유 없이)"
-}
-
-규칙:
-- 반드시 웹 검색 후 실제 검색된 내용만 작성
-- 확인 안 된 정보는 "확인 필요"로 표기
-- 투자 권유 금지
-- 한국어로 작성
-- JSON 외 다른 텍스트 절대 포함 금지`;
-
   try {
-    const url = 'https://api.groq.com/openai/v1/chat/completions';
-    const res = await fetch(url, {
+    // 1단계: Cloudflare Worker 통해 네이버 뉴스 수집
+    const newsRes = await fetch(`${WORKER_URL}/news?q=${encodeURIComponent(stock.name + ' 주식')}`);
+    const newsData = newsRes.ok ? await newsRes.json() : { items: [] };
+
+    // 2단계: Worker 통해 Groq 분석 요청
+    const analyzeRes = await fetch(`${WORKER_URL}/analyze`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 2048,
-        temperature: 0.3
+        stockName: stock.name,
+        stockCode: stock.code,
+        newsData: newsData,
+        dartData: { list: [] }, // DART 키 오면 활성화
+        groqKey: apiKey
       })
     });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error?.message || `HTTP ${res.status}`);
+    if (!analyzeRes.ok) {
+      const err = await analyzeRes.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `HTTP ${analyzeRes.status}`);
     }
 
-    const data = await res.json();
-    let raw = data.choices?.[0]?.message?.content || '';
+    const groqData = await analyzeRes.json();
+    let raw = groqData.choices?.[0]?.message?.content || '';
     raw = raw.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('분석 결과 파싱 실패. 다시 시도해주세요.');
     const parsed = JSON.parse(jsonMatch[0]);
+    parsed._newsCount = (newsData?.items || []).length;
     const now = new Date();
     cache[activeId] = { data: parsed, updatedAt: now };
     renderWatchlist();
@@ -880,6 +846,7 @@ function renderResult(stock, d, updatedAt) {
       </div>
       <div class="article-meta">
         <span>⚡ Groq llama-3.3-70b</span>
+        ${d._newsCount > 0 ? `<span style="color:var(--good)">📡 뉴스 ${d._newsCount}건 수집</span>` : `<span style="color:var(--warn)">⚠️ AI 추정 (뉴스 미수집)</span>`}
         <span>📅 ${updStr}</span>
         <span style="color:var(--bad);font-size:0.58rem;">※ 투자 권유 아님</span>
       </div>
