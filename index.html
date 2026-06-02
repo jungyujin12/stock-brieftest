@@ -265,13 +265,18 @@ async function autoLoadUrl() {
         WORKER_URL = url;
         localStorage.setItem('sb_server_url', url);
         document.getElementById('serverUrl').value = url;
-        await checkServer();
+        checkServer(); // await 제거 - 연결 실패해도 계속
         return;
       }
     }
-  } catch(e) {}
+  } catch(e) {
+    console.log('GitHub URL 로드 실패:', e);
+  }
   // GitHub에서 못 가져오면 로컬스토리지 사용
-  if (WORKER_URL) checkServer();
+  if (WORKER_URL) {
+    document.getElementById('serverUrl').value = WORKER_URL;
+    checkServer();
+  }
 }
 
 function saveUrl() {
