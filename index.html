@@ -465,6 +465,20 @@ async function fetchAnalysis(stock) {
     const parsed = JSON.parse(jsonMatch[0]);
     parsed._newsCount = newsData.items.length;
     parsed._dartCount = (dartData?.list || []).length;
+
+    // DART 공시에 링크 추가
+    if (parsed.disclosures) {
+      const dartList = dartData?.list || [];
+      parsed.disclosures = parsed.disclosures.map((d, i) => {
+        const dart = dartList[i];
+        return {
+          ...d,
+          link: dart?.rcept_no
+            ? `https://dart.fss.or.kr/dsaf001/main.do?rcept_no=${dart.rcept_no}`
+            : ''
+        };
+      });
+    }
     parsed._query = query;
 
     const now = new Date();
