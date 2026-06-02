@@ -566,6 +566,7 @@ function renderResult(stock, d, updatedAt) {
       <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">
         <div class="article-title">${escHtml(stock.name)}${stock.code ? `<span style="font-size:1rem;color:var(--muted);font-weight:400;margin-left:10px">${escHtml(stock.code)}</span>` : ''}</div>
         <div class="article-actions">
+          ${stock.code ? `<button class="share-btn" onclick="openLink('https://dart.fss.or.kr/dsab001/search.ax?textCrpNm=${stock.code}')">📋 DART 공시</button>` : ''}
           <button class="share-btn" onclick="shareResult('${stock.id}')">🔗 공유</button>
           <button class="refresh-btn" onclick="refresh('${stock.id}')">↻ 새로고침</button>
         </div>
@@ -594,11 +595,14 @@ function renderResult(stock, d, updatedAt) {
       </div>
     </div>
 
-    ${discHtml ? `
     <div style="margin-bottom:16px">
-      <div class="col-header"><div class="col-icon dart">D</div><div class="col-title dart">DART 공시</div></div>
-      <div class="news-items">${discHtml}</div>
-    </div>` : ''}
+      <div class="col-header">
+        <div class="col-icon dart">D</div>
+        <div class="col-title dart">DART 공시</div>
+        ${stock.code ? `<a href="https://dart.fss.or.kr/dsab001/search.ax?textCrpNm=${stock.code}" target="_blank" rel="noopener noreferrer" style="margin-left:auto;font-family:'Nanum Gothic Coding',monospace;font-size:.6rem;color:var(--accent2);border:1px solid var(--accent2);padding:3px 10px;text-decoration:none;transition:all .2s" onmouseover="this.style.background='var(--accent2)';this.style.color='#fff'" onmouseout="this.style.background='';this.style.color='var(--accent2)'">DART에서 전체보기 →</a>` : ''}
+      </div>
+      ${discHtml ? `<div class="news-items">${discHtml}</div>` : `<div style="color:var(--muted);font-size:.7rem">공시 없음 (종목코드 필요)</div>`}
+    </div>
 
     ${d.summary ? `
     <div class="summary-bar">
