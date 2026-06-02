@@ -228,6 +228,7 @@ body::before{content:'';position:fixed;inset:0;background-image:repeating-linear
 // ── CONFIG ─────────────────────────────────────────────
 const MAX_HISTORY = 3;
 const NEWS_MAX_AGE_DAYS = 7;
+const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/jungyujin12/stock-brieftest/main/server_url.txt';
 
 // ── STATE ──────────────────────────────────────────────
 let WORKER_URL = localStorage.getItem('sb_server_url') || '';
@@ -254,8 +255,6 @@ let isDark = localStorage.getItem('sb_dark') === '1';
 })();
 
 // ── SERVER URL ─────────────────────────────────────────
-const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/jungyujin12/stock-brieftest/main/server_url.txt';
-
 async function autoLoadUrl() {
   try {
     const res = await fetch(GITHUB_RAW_URL + '?t=' + Date.now());
