@@ -287,13 +287,18 @@ async function checkServer() {
   const apiEl = document.getElementById('apiStatus');
   statusEl.textContent = '확인 중...';
   statusEl.style.color = 'var(--muted)';
+
+  // URL 항상 입력창에 표시
+  if (WORKER_URL) document.getElementById('serverUrl').value = WORKER_URL;
+
   try {
-    const res = await fetch(`${WORKER_URL}/`, { signal: AbortSignal.timeout(5000) });
+    const res = await fetch(`${WORKER_URL}/`, { signal: AbortSignal.timeout(8000) });
     if (res.ok) {
       statusEl.textContent = '✓ 연결됨';
       statusEl.style.color = 'var(--good)';
       apiEl.textContent = '● 서버 연결됨';
       apiEl.style.color = 'var(--good)';
+      toast('✓ 서버 자동 연결됨!');
       if (activeId === null) showWelcomeConnected();
     }
   } catch(e) {
