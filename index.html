@@ -469,17 +469,14 @@ async function fetchAnalysis(stock) {
     // DART 공시에 링크 추가
     if (parsed.disclosures) {
       const dartList = dartData?.list || [];
-      parsed.disclosures = parsed.disclosures.map((d, i) => {
-        const dart = dartList[i];
-        return {
-          ...d,
-          link: dart?.rcept_no
-            ? `https://dart.fss.or.kr/dsaf001/main.do?rcept_no=${dart.rcept_no}`
-            : dart?.corp_name
-            ? `https://dart.fss.or.kr/dsab001/search.ax?textCrpNm=${encodeURIComponent(dart.corp_name)}`
-            : ''
-        };
-      });
+      // 종목코드로 DART 공시 검색 링크 생성
+      const dartLink = stock.code
+        ? `https://dart.fss.or.kr/dsab001/search.ax?textCrpNm=${stock.code}`
+        : '';
+      parsed.disclosures = parsed.disclosures.map((d, i) => ({
+        ...d,
+        link: dartLink
+      }));
     }
     parsed._query = query;
 
