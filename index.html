@@ -388,7 +388,7 @@ async function refreshAll() {
   for (const s of stocks) {
     delete cache[s.id];
     await fetchAnalysis(s);
-    await new Promise(r => setTimeout(r, 600));
+    await new Promise(r => setTimeout(r, 8000)); // 8초 간격 (분당 8회 제한)
   }
   toast('✓ 전체 갱신 완료');
 }
