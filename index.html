@@ -475,6 +475,8 @@ async function fetchAnalysis(stock) {
           ...d,
           link: dart?.rcept_no
             ? `https://dart.fss.or.kr/dsaf001/main.do?rcept_no=${dart.rcept_no}`
+            : dart?.corp_name
+            ? `https://dart.fss.or.kr/dsab001/search.ax?textCrpNm=${encodeURIComponent(dart.corp_name)}`
             : ''
         };
       });
