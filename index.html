@@ -384,17 +384,12 @@ async function fetchAnalysis(stock) {
       })
     };
 
-    // DART 공시 수집 (종목명으로 corp_code 먼저 찾기)
+    // DART 공시 수집 (종목명으로 직접 공시 검색)
     let dartData = { list: [] };
     try {
       const dartSearchRes = await fetch(`${WORKER_URL}/dart/search?name=${encodeURIComponent(stock.name)}`);
       if (dartSearchRes.ok) {
-        const dartSearch = await dartSearchRes.json();
-        const corpCode = dartSearch?.list?.[0]?.corp_code;
-        if (corpCode) {
-          const dartListRes = await fetch(`${WORKER_URL}/dart/list?corp_code=${corpCode}`);
-          if (dartListRes.ok) dartData = await dartListRes.json();
-        }
+        dartData = await dartSearchRes.json();
       }
     } catch(e) { /* DART 실패해도 계속 진행 */ }
 
