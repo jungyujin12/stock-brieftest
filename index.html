@@ -109,6 +109,8 @@ body::before{content:'';position:fixed;inset:0;background-image:repeating-linear
 .news-tag.good{background:#e8f5ec;color:var(--good)}
 .news-tag.bad{background:#fdf0f0;color:var(--bad)}
 .news-tag.dart{background:#e8eef8;color:var(--accent2)}
+.news-item.has-link:hover{background:var(--tag-bg);margin:-4px;padding:4px;border-radius:2px}
+.news-link-icon{font-size:.65rem;color:var(--accent2);margin-left:4px;vertical-align:middle}
 
 /* HISTORY */
 .history-section{margin-top:16px;border-top:1px solid var(--rule);padding-top:14px}
@@ -384,14 +386,14 @@ async function fetchAnalysis(stock) {
       })
     };
 
-    // DART 공시 수집 (종목명으로 직접 공시 검색)
+    // DART 공시 수집 (종목코드로 직접 조회)
     let dartData = { list: [] };
-    try {
-      const dartSearchRes = await fetch(`${WORKER_URL}/dart/search?name=${encodeURIComponent(stock.name)}`);
-      if (dartSearchRes.ok) {
-        dartData = await dartSearchRes.json();
-      }
-    } catch(e) { /* DART 실패해도 계속 진행 */ }
+    if (stock.code) {
+      try {
+        const dartRes = await fetch(`${WORKER_URL}/dart/search?stock_code=${encodeURIComponent(stock.code)}`);
+        if (dartRes.ok) dartData = await dartRes.json();
+      } catch(e) { /* DART 실패해도 계속 진행 */ }
+    }
 
     // Groq 분석
     const analyzeRes = await fetch(`${WORKER_URL}/analyze`, {
@@ -561,8 +563,8 @@ function renderResult(stock, d, updatedAt) {
 function renderItems(items, type) {
   if (!items?.length) return `<div style="color:var(--muted);font-size:.7rem">항목 없음</div>`;
   return items.map(item => `
-    <div class="news-item">
-      <div class="news-headline">${escHtml(item.headline||'')}</div>
+    <div class="news-item${item.link ? ' has-link' : ''}" ${item.link ? `onclick="window.open('${item.link}','_blank')" style="cursor:pointer"` : ''}>
+      <div class="news-headline">${escHtml(item.headline||'')}${item.link ? '<span class="news-link-icon">↗</span>' : ''}</div>
       <div class="news-desc">${escHtml(item.desc||'')}</div>
       ${item.tag ? `<span class="news-tag ${type}">${escHtml(item.tag)}</span>` : ''}
     </div>`).join('');
