@@ -458,17 +458,29 @@ async function fetchAnalysis(stock) {
       })
     };
 
-    // Step 2: DART 공시
+    // Step 2: DART 공시 + 주가 + 재무 병렬 조회
     updateLoadingStep(stock.id, 2);
     let dartData = { list: [] };
+    let stockData = {};
+    let financeData = {};
+
     if (stock.code) {
-      try {
-        const dartRes = await fetch(`${WORKER_URL}/dart/search?stock_code=${encodeURIComponent(stock.code)}`);
-        if (dartRes.ok) {
-          const d = await dartRes.json();
-          if (d && !d.error) dartData = d;
-        }
-      } catch(e) {}
+      const [dartRes, stockRes, finRes] = await Promise.allSettled([
+        fetch(`${WORKER_URL}/dart/search?stock_code=${encodeURIComponent(stock.code)}`),
+        fetch(`${WORKER_URL}/stock?code=${encodeURIComponent(stock.code)}`),
+        fetch(`${WORKER_URL}/dart/finance?stock_code=${encodeURIComponent(stock.code)}`)
+      ]);
+
+      if (dartRes.status === 'fulfilled' && dartRes.value.ok) {
+        const d = await dartRes.value.json();
+        if (d && !d.error) dartData = d;
+      }
+      if (stockRes.status === 'fulfilled' && stockRes.value.ok) {
+        stockData = await stockRes.value.json();
+      }
+      if (finRes.status === 'fulfilled' && finRes.value.ok) {
+        financeData = await finRes.value.json();
+      }
     }
 
     // Step 3: Ollama 분석
@@ -476,7 +488,7 @@ async function fetchAnalysis(stock) {
     const analyzeRes = await fetch(`${WORKER_URL}/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ stockName: stock.name, stockCode: stock.code, sector: stock.sector, newsData, dartData })
+      body: JSON.stringify({ stockName: stock.name, stockCode: stock.code, sector: stock.sector, newsData, dartData, stockData, financeData })
     });
 
     if (!analyzeRes.ok) {
@@ -490,6 +502,8 @@ async function fetchAnalysis(stock) {
 
     parsed._newsCount = newsData.items.length;
     parsed._dartCount = (dartData?.list || []).length;
+    parsed._stockData = stockData;
+    parsed._financeData = financeData;
 
     if (parsed.disclosures && stock.code) {
       const dartLink = `https://dart.fss.or.kr/dsab001/search.ax?textCrpNm=${stock.code}`;
@@ -596,9 +610,37 @@ function renderResult(stock, d, updatedAt) {
         ${d._newsCount > 0 ? `<span style="color:var(--good)">📡 뉴스 ${d._newsCount}건</span>` : `<span style="color:var(--warn)">⚠️ 뉴스 없음</span>`}
         ${d._dartCount > 0 ? `<span style="color:var(--accent2)">📋 공시 ${d._dartCount}건</span>` : ''}
         <span>📅 ${updStr}</span>
-        <span style="color:var(--bad);font-size:.56rem">※ 투자 권유 아님</span>
+        <span style="color:var(--bad);font-size:.56rem">⚠️ AI 생성 정보 · 투자 결정 전 전문가 상담 필수 · 투자 손실 책임은 본인에게 있음</span>
       </div>
     </div>
+
+    ${d._stockData && !d._stockData.error ? `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px;padding:14px;background:var(--tag-bg);border:1px solid var(--rule)">
+      <div style="text-align:center">
+        <div style="font-family:'Nanum Gothic Coding',monospace;font-size:.58rem;color:var(--muted);margin-bottom:4px">현재가</div>
+        <div style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:700;color:var(--ink)">${d._stockData.currentPrice?.toLocaleString()}원</div>
+        <div style="font-size:.72rem;color:${d._stockData.changePct>=0?'var(--good)':'var(--bad)'};font-weight:600">${d._stockData.changePct>=0?'+':''}${d._stockData.changePct}%</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-family:'Nanum Gothic Coding',monospace;font-size:.58rem;color:var(--muted);margin-bottom:4px">52주 최고</div>
+        <div style="font-size:.82rem;font-weight:600;color:var(--good)">${d._stockData.week52High?.toLocaleString()}원</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-family:'Nanum Gothic Coding',monospace;font-size:.58rem;color:var(--muted);margin-bottom:4px">52주 최저</div>
+        <div style="font-size:.82rem;font-weight:600;color:var(--bad)">${d._stockData.week52Low?.toLocaleString()}원</div>
+      </div>
+      ${d._financeData && !d._financeData.error && d._financeData.operatingMargin ? `
+      <div style="text-align:center">
+        <div style="font-family:'Nanum Gothic Coding',monospace;font-size:.58rem;color:var(--muted);margin-bottom:4px">영업이익률</div>
+        <div style="font-size:.82rem;font-weight:600;color:var(--ink)">${d._financeData.operatingMargin}%</div>
+        <div style="font-size:.6rem;color:var(--muted)">${d._financeData.year}년</div>
+      </div>` : ''}
+      ${d._financeData && !d._financeData.error && d._financeData.debtRatio ? `
+      <div style="text-align:center">
+        <div style="font-family:'Nanum Gothic Coding',monospace;font-size:.58rem;color:var(--muted);margin-bottom:4px">부채비율</div>
+        <div style="font-size:.82rem;font-weight:600;color:var(--ink)">${d._financeData.debtRatio}%</div>
+      </div>` : ''}
+    </div>` : ''}
 
     <div class="columns">
       <div class="news-col">
